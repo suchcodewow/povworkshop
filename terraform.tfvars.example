@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars and fill in your values.
+
+region = "us-central1"
+zone   = "us-central1-a"
+prefix = "workshop"
+
+# One cluster is created per entry, in that attendee's own (existing) project.
+# Key = attendee id (lowercase letters, numbers, hyphens); value = project ID.
+attendee_projects = {
+  alice = "ws-alice-1234"
+  bob   = "ws-bob-5678"
+  carol = "ws-carol-9012"
+}
+
+# Workshop-friendly defaults (cheap, interruptible):
+preemptible    = true
+machine_type   = "e2-standard-2"
+node_count     = 1
+max_node_count = 2
