@@ -17,6 +17,7 @@ anything in. See workshop.config.json and the "Manage secrets" menu item.
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import shutil
@@ -201,6 +202,22 @@ def load_secrets() -> None:
         print(f"(loaded {len(loaded)} secret(s): {', '.join(loaded)})")
     if missing:
         print(f"(unset: {', '.join(missing)} — populate via 'Manage secrets')")
+
+
+def set_derived_vars() -> None:
+    """Derive the Harness org name/identifier from the current month.
+
+    name       = "<Month>_INT"  (e.g. July_INT)
+    identifier = "<month>_int"  (lowercase, e.g. july_int)
+
+    Passed to Terraform as TF_VAR_org_name / TF_VAR_org_identifier. Using a
+    concrete string here (rather than timestamp() inside Terraform) keeps the
+    value stable within a month — so no spurious diffs — while still rolling to
+    a new org each month. An explicit export wins (setdefault).
+    """
+    month = datetime.date.today().strftime("%B")  # full month name, e.g. "July"
+    os.environ.setdefault("TF_VAR_org_name", f"{month}_INT")
+    os.environ.setdefault("TF_VAR_org_identifier", f"{month.lower()}_int")
 
 
 def manage_secrets() -> None:
@@ -414,6 +431,7 @@ def build_menu() -> list[tuple[str, callable]]:
 
 def main() -> None:
     load_secrets()
+    set_derived_vars()
     items = build_menu()
     while True:
         print(f"\n=== Workshop Terraform ({BIN}) — auto-approve ===")

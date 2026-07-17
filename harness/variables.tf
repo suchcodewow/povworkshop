@@ -26,23 +26,28 @@ variable "endpoint" {
 
 variable "org_identifier" {
   description = <<-EOT
-    Unique identifier for the workshop organization. Must start with a letter or
-    underscore and contain only letters, digits, and underscores (no hyphens or
-    spaces), <= 128 chars.
+    Unique (lowercase) identifier for the workshop organization. Leave null to
+    let workshop.py derive it from the current month as "<month>_int" (e.g.
+    "july_int"); set a string to override. Must start with a lowercase letter or
+    underscore and contain only lowercase letters, digits, and underscores
+    (no hyphens or spaces), <= 128 chars.
   EOT
   type        = string
-  default     = "workshop"
+  default     = null
 
   validation {
-    condition     = can(regex("^[a-zA-Z_][0-9a-zA-Z_]{0,127}$", var.org_identifier))
-    error_message = "org_identifier must start with a letter/underscore and contain only letters, digits, and underscores (<= 128 chars)."
+    condition     = var.org_identifier == null || can(regex("^[a-z_][0-9a-z_]{0,127}$", var.org_identifier))
+    error_message = "org_identifier must be lowercase: start with a letter/underscore and contain only lowercase letters, digits, and underscores (<= 128 chars)."
   }
 }
 
 variable "org_name" {
-  description = "Display name for the workshop organization."
+  description = <<-EOT
+    Display name for the workshop organization. Leave null to auto-generate as
+    "<current month>_INT" (e.g. "July_INT"); set a string to override.
+  EOT
   type        = string
-  default     = "Workshop"
+  default     = null
 }
 
 variable "org_description" {

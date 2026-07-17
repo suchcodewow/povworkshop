@@ -12,7 +12,12 @@
 # account_id       = "your_harness_account_id"
 # platform_api_key = "pat.xxxxx.xxxxx.xxxxx"
 
-# The organization to create:
-org_identifier  = "workshop"
-org_name        = "Workshop"
+# The organization to create.
+#
+# org_identifier and org_name are normally left UNSET: workshop.py derives them
+# from the current month as "<month>_int" / "<Month>_INT" (e.g. july_int /
+# July_INT). Uncomment to override.
+# org_identifier = "july_int"     # lowercase letters/digits/underscores only
+# org_name       = "July_INT"
+
 org_description = "Organization for the workshop."
