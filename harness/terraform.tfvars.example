@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and fill in your values.
+#
+# Credentials: the token is SENSITIVE. Prefer exporting it as an env var and
+# leaving the vars below unset — the provider reads them automatically:
+#
+#   export HARNESS_ACCOUNT_ID="your_account_id"
+#   export HARNESS_PLATFORM_API_KEY="pat.xxxxx.xxxxx.xxxxx"
+#
+# (This repo's .gitignore ignores *.tfvars, but env vars keep secrets out of
+# files entirely.)
+
+# account_id       = "your_harness_account_id"
+# platform_api_key = "pat.xxxxx.xxxxx.xxxxx"
+
+# The organization to create:
+org_identifier  = "workshop"
+org_name        = "Workshop"
+org_description = "Organization for the workshop."

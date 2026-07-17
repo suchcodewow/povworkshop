@@ -1,0 +1,11 @@
+{
+  "_comment": "Non-secret config. operator_project is the central GCP project holding the workshop secrets in Secret Manager; override with WORKSHOP_OPERATOR_PROJECT. 'secrets' maps an environment variable name to the Secret Manager secret that holds its value. Secret VALUES never live here — only in Secret Manager.",
+  "operator_project": "administration-459416",
+  "secrets": {
+    "HARNESS_ACCOUNT_ID": "harness-account-id",
+    "HARNESS_PLATFORM_API_KEY": "harness-platform-api-key",
+    "TF_VAR_billing_account": "gcp-billing-account",
+    "TF_VAR_parent": "gcp-parent",
+    "TF_VAR_attendee_emails": "attendee-emails"
+  }
+}

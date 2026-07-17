@@ -3,11 +3,16 @@
 
 Runs the layers in their documented order:
 
-    projects  ->  clusters (root)  ->  addons  ->  k8s-addons (per attendee)
+    harness -> projects -> clusters -> addons -> k8s-addons (per attendee)
 
 Pick a step from the menu; it runs the tofu/terraform command, streams the
 output live, and drops you back at the menu. Requires `tofu` (preferred) or
 `terraform` on PATH; override with the TF_BIN environment variable.
+
+Secrets (Harness token, GCP billing/parent, attendee emails) live in GCP
+Secret Manager in a central operator project; on startup they're loaded into
+the environment (as HARNESS_* / TF_VAR_*) so every layer runs without typing
+anything in. See workshop.config.json and the "Manage secrets" menu item.
 """
 
 from __future__ import annotations
@@ -24,7 +29,9 @@ ROOT = Path(__file__).resolve().parent
 # Layers in apply order. `dir` is relative to this repo root; each layer lives
 # in its own subfolder. `per_attendee` layers use one workspace per attendee.
 LAYERS = [
-    {"key": "projects", "dir": "projects", "name": "Projects  (attendee GCP projects, run first)"},
+    {"key": "harness", "dir": "harness", "name": "Harness   (workshop organization)",
+     "requires": ["HARNESS_ACCOUNT_ID", "HARNESS_PLATFORM_API_KEY"]},
+    {"key": "projects", "dir": "projects", "name": "Projects  (attendee GCP projects)"},
     {"key": "clusters", "dir": "kubernetes", "name": "Clusters  (GKE + network + registry)"},
     {"key": "addons", "dir": "addons", "name": "Add-ons   (firewall, Binary Authorization)"},
     {"key": "k8s", "dir": "k8s-addons", "name": "K8s add-ons (in-cluster, per attendee)", "per_attendee": True},
@@ -32,6 +39,34 @@ LAYERS = [
 
 # Directory of the clusters layer (used directly when reading its state/outputs).
 CLUSTERS_DIR = (ROOT / "kubernetes").resolve()
+
+# --- configuration & secrets ------------------------------------------------
+#
+# workshop.config.json (committed, NO secrets) holds the central operator
+# project that stores the secrets, plus a mapping of env-var name -> Secret
+# Manager secret name. Secret VALUES never live in the repo — only in Secret
+# Manager. WORKSHOP_OPERATOR_PROJECT overrides the operator project.
+
+CONFIG_FILE = ROOT / "workshop.config.json"
+LOCAL_SECRETS_FILE = ROOT / "secrets.local.env"  # one-time bootstrap input (gitignored)
+
+
+def load_config() -> dict:
+    cfg = {"operator_project": None, "secrets": {}}
+    if CONFIG_FILE.exists():
+        try:
+            cfg.update(json.loads(CONFIG_FILE.read_text()))
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"!! could not read {CONFIG_FILE.name}: {e}")
+    env_proj = os.environ.get("WORKSHOP_OPERATOR_PROJECT")
+    if env_proj:
+        cfg["operator_project"] = env_proj
+    return cfg
+
+
+CONFIG = load_config()
+SECRETS: dict[str, str] = CONFIG.get("secrets", {})       # env var -> secret name
+OPERATOR_PROJECT: str | None = CONFIG.get("operator_project")
 
 def tf_bin() -> str:
     """Resolve the Terraform binary: $TF_BIN, then tofu, then terraform."""
@@ -122,6 +157,102 @@ def gcloud_run(args: list[str]) -> int:
     return subprocess.run(cmd).returncode
 
 
+# --- secrets (GCP Secret Manager) -------------------------------------------
+
+def access_secret(name: str) -> str | None:
+    """Read the latest version of a secret; None if missing/unreadable."""
+    if not OPERATOR_PROJECT:
+        return None
+    code, out, _ = gcloud_capture(
+        ["secrets", "versions", "access", "latest",
+         "--secret", name, "--project", OPERATOR_PROJECT])
+    # Strip a single trailing newline (e.g. if a value was stored via `echo`);
+    # tokens/ids/JSON never rely on one.
+    return out[:-1] if code == 0 and out.endswith("\n") else (out if code == 0 else None)
+
+
+def load_secrets() -> None:
+    """Populate os.environ from Secret Manager so terraform/harness inherit it.
+
+    Values already set in the environment WIN (a hand-exported value overrides
+    the stored one). Missing secrets are skipped — a layer that needs one will
+    fail loudly on its own.
+    """
+    if not SECRETS:
+        return
+    if not OPERATOR_PROJECT:
+        print("!! no operator_project (workshop.config.json / "
+              "WORKSHOP_OPERATOR_PROJECT) — skipping secret load.")
+        return
+    if not shutil.which("gcloud"):
+        print("!! gcloud not found — cannot load secrets.")
+        return
+    loaded, missing = [], []
+    for env_var, secret_name in SECRETS.items():
+        if os.environ.get(env_var):
+            continue  # already set by hand — don't clobber
+        val = access_secret(secret_name)
+        if val is None:
+            missing.append(f"{env_var}<-{secret_name}")
+            continue
+        os.environ[env_var] = val
+        loaded.append(env_var)
+    if loaded:
+        print(f"(loaded {len(loaded)} secret(s): {', '.join(loaded)})")
+    if missing:
+        print(f"(unset: {', '.join(missing)} — populate via 'Manage secrets')")
+
+
+def manage_secrets() -> None:
+    """One-time setup: push local secret values up to Secret Manager.
+
+    Reads KEY=VALUE lines from secrets.local.env (gitignored), where KEY is one
+    of the env-var names in SECRETS. Creates each secret if needed, then adds a
+    new version from stdin (so the value never appears in argv). Delete
+    secrets.local.env afterward — the values then live only in Secret Manager.
+    """
+    if not OPERATOR_PROJECT:
+        print("!! set operator_project in workshop.config.json first.")
+        return
+    if not shutil.which("gcloud"):
+        print("!! gcloud not found.")
+        return
+    if not LOCAL_SECRETS_FILE.exists():
+        print(f"!! create {LOCAL_SECRETS_FILE.name} with KEY=VALUE lines, then "
+              f"re-run. Keys: {', '.join(SECRETS) or '(none configured)'}")
+        return
+
+    gcloud_run(["services", "enable", "secretmanager.googleapis.com",
+                "--project", OPERATOR_PROJECT])
+
+    values: dict[str, str] = {}
+    for line in LOCAL_SECRETS_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        values[k.strip()] = v.strip()
+
+    for env_var, secret_name in SECRETS.items():
+        if env_var not in values:
+            print(f"  (skip {secret_name}: no {env_var} in {LOCAL_SECRETS_FILE.name})")
+            continue
+        code, _, _ = gcloud_capture(
+            ["secrets", "describe", secret_name, "--project", OPERATOR_PROJECT])
+        if code != 0:
+            gcloud_run(["secrets", "create", secret_name,
+                        "--replication-policy", "automatic",
+                        "--project", OPERATOR_PROJECT])
+        proc = subprocess.run(
+            ["gcloud", "secrets", "versions", "add", secret_name,
+             "--data-file=-", "--project", OPERATOR_PROJECT],
+            input=values[env_var], text=True)
+        print(f"  {secret_name}: {'ok' if proc.returncode == 0 else f'FAILED ({proc.returncode})'}")
+
+    print(f"\nDone. Now DELETE {LOCAL_SECRETS_FILE.name} — the values live in "
+          "Secret Manager. Reload with 'Reload secrets' or restart.")
+
+
 def select_workspace(d: Path, name: str) -> int:
     """Select (creating if needed) a workspace, for tofu or terraform."""
     if Path(BIN).name == "terraform":
@@ -133,8 +264,30 @@ def select_workspace(d: Path, name: str) -> int:
 
 # --- per-layer actions ------------------------------------------------------
 
+def missing_required_env(layer: dict) -> list[str]:
+    """Env-var credentials a layer needs that are neither set nor plausibly
+    supplied by a local terraform.tfvars in that layer."""
+    required = layer.get("requires", [])
+    if not required:
+        return []
+    # A committed/local terraform.tfvars may provide the values instead of env.
+    if (layer_dir(layer) / "terraform.tfvars").exists():
+        return []
+    return [v for v in required if not os.environ.get(v)]
+
+
 def act(layer: dict, action: str) -> int:
     """Run plan/apply/destroy for a layer (looping attendees if per-attendee)."""
+    missing = missing_required_env(layer)
+    if missing:
+        print(f"!! {layer['key']}: required credential(s) not set: {', '.join(missing)}")
+        print("   These load from Secret Manager on startup. Fix by either:")
+        print("     - running via `python3 workshop.py` (loads secrets automatically), or")
+        print("     - main menu -> 'Manage secrets' to populate them, then 'Reload secrets', or")
+        print("     - exporting them by hand before running.")
+        secret_hint = [SECRETS.get(v, "?") for v in missing]
+        print(f"   (Secret Manager names: {', '.join(secret_hint)} in {OPERATOR_PROJECT})")
+        return 1
     if not ensure_init(layer):
         return 1
     d = layer_dir(layer)
@@ -250,14 +403,17 @@ def build_menu() -> list[tuple[str, callable]]:
         for label, action in (("plan & apply", "apply"), ("destroy", "destroy")):
             items.append((f"{layer['name']:<44s} {label}",
                           lambda l=layer, a=action: act(l, a)))
-    items.append(("ALL: apply  (projects -> clusters -> addons -> k8s)", lambda: apply_all()))
-    items.append(("ALL: destroy (k8s -> addons -> clusters)", lambda: destroy_all()))
+    items.append(("ALL: apply  (harness -> projects -> clusters -> addons -> k8s)", lambda: apply_all()))
+    items.append(("ALL: destroy (k8s -> addons -> clusters -> harness)", lambda: destroy_all()))
     items.append(("Clean up orphaned clusters (delete GKE clusters not in state)", lambda: cleanup_orphans()))
     items.append(("Show outputs for a layer", lambda: show_outputs()))
+    items.append(("Manage secrets (push secrets.local.env -> Secret Manager)", lambda: manage_secrets()))
+    items.append(("Reload secrets from Secret Manager", lambda: load_secrets()))
     return items
 
 
 def main() -> None:
+    load_secrets()
     items = build_menu()
     while True:
         print(f"\n=== Workshop Terraform ({BIN}) — auto-approve ===")

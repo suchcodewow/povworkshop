@@ -27,6 +27,41 @@ Per attendee, in that attendee's project:
 - An Artifact Registry (Docker) repo, readable only by that attendee's nodes
 - Workload Identity for secure pod → GCP API access
 
+## Secrets & running on a new machine
+
+All sensitive values — the Harness token, GCP billing account, parent org/folder,
+and attendee emails — live in **GCP Secret Manager** in a central *operator*
+project, never in the repo. [`workshop.py`](workshop.py) loads them into the
+environment on startup (as `HARNESS_*` / `TF_VAR_*`), so every layer runs
+without you typing anything in. Non-secret config (region, prefix, machine
+types) is just committed defaults.
+
+The single credential you carry is your **GCP login** — everything else,
+including the Harness token, sits behind it.
+
+**First-time setup (type each value exactly once, ever):**
+
+1. Pick/create a central operator project and set it in
+   [`workshop.config.json`](workshop.config.json) (`operator_project`) — or
+   export `WORKSHOP_OPERATOR_PROJECT`.
+2. `cp secrets.local.env.example secrets.local.env` and fill in the values.
+3. Run `python3 workshop.py` → **Manage secrets** — this enables the Secret
+   Manager API and pushes each value up (via stdin, so it never hits argv).
+4. **Delete `secrets.local.env`** (it's gitignored, but delete it anyway).
+
+**On any machine afterward:**
+
+```sh
+git clone <repo> && cd workshop
+gcloud auth login && gcloud auth application-default login
+python3 workshop.py        # loads secrets from Secret Manager, then runs any layer
+```
+
+The mapping of env var → secret name lives in
+[`workshop.config.json`](workshop.config.json); a value already exported in your
+shell overrides the stored one, and Terraform reads list-typed vars (e.g.
+`TF_VAR_attendee_emails`) from the env as HCL/JSON.
+
 ## Prerequisites
 
 1. Install either [Terraform](https://developer.hashicorp.com/terraform/install) (>= 1.5)
