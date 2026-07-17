@@ -19,6 +19,22 @@ variable "attendee_emails" {
   }
 }
 
+variable "shared_editor_emails" {
+  description = <<-EOT
+    Emails granted roles/editor on EVERY attendee project but given NO project
+    of their own (e.g. instructors/operators). Separate from attendee_emails —
+    these addresses never create a project, VPC, cluster, or node SA; they only
+    receive the cross-project editor grant.
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for e in var.shared_editor_emails : can(regex("^[^@]+@[^@]+$", e))])
+    error_message = "Each entry must be a valid email address of the form local@domain."
+  }
+}
+
 variable "parent" {
   description = "Parent for the created projects: \"organizations/<id>\" or \"folders/<id>\" (e.g. \"organizations/805624170808\" or \"folders/916995945005\")."
   type        = string

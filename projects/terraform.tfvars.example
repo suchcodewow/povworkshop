@@ -10,3 +10,8 @@ attendee_emails = [
   "bob.jones@example.com",
   "carol.diaz@example.com",
 ]
+
+# Instructors/operators: editor on every project above, no project of their own.
+# shared_editor_emails = [
+#   "instructor@example.com",
+# ]

@@ -75,6 +75,23 @@ resource "google_project_iam_member" "attendee_admin" {
   member  = "user:${each.value}"
 }
 
+# Shared editors: editor on every attendee project, no project of their own.
+# Uses setproduct(attendees × emails) so each shared editor is bound in each
+# attendee project via the additive *_member (won't clobber other IAM).
+resource "google_project_iam_member" "shared_editors" {
+  for_each = {
+    for pair in setproduct(keys(local.attendees), var.shared_editor_emails) :
+    "${pair[0]}::${pair[1]}" => {
+      attendee = pair[0]
+      email    = pair[1]
+    }
+  }
+
+  project = google_project.attendee[each.value.attendee].project_id
+  role    = "roles/editor"
+  member  = "user:${each.value.email}"
+}
+
 resource "google_project_service" "enabled" {
   for_each = local.project_apis
 
