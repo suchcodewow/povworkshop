@@ -53,6 +53,17 @@ terraform.rc
 *.swp
 *.swo
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
 # Environment / secrets
 .env
 *.pem
