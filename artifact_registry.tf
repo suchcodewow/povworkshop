@@ -7,7 +7,7 @@
 resource "google_artifact_registry_repository" "attendee" {
   for_each = toset(local.attendees)
 
-  project       = var.attendee_projects[each.key]
+  project       = local.attendee_projects[each.key]
   location      = var.region
   repository_id = "${var.prefix}-${each.key}"
   description   = "Workshop container images for ${each.key}"

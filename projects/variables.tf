@@ -1,20 +1,32 @@
-variable "attendees" {
+variable "attendee_emails" {
   description = <<-EOT
-    List of attendee identifiers, one project per attendee. Each must be a
-    valid name fragment: lowercase letters, numbers, and hyphens. Keep them
-    short — the generated project_id (prefix-attendee-suffix) must be <= 30 chars.
+    List of attendee email addresses, one project per attendee. Each local part
+    (before the @) must be "first.last"; the project-name fragment is derived by
+    joining the name parts together and lowercasing (e.g. Shawn.Pearson@x.com ->
+    shawnpearson). Keep names short — the generated project_id
+    (prefix-firstlast-suffix) must be <= 30 chars.
   EOT
   type        = list(string)
 
   validation {
-    condition     = length(var.attendees) > 0
-    error_message = "Provide at least one attendee."
+    condition     = length(var.attendee_emails) > 0
+    error_message = "Provide at least one attendee email."
+  }
+
+  validation {
+    condition     = alltrue([for e in var.attendee_emails : can(regex("^[^@]+@[^@]+$", e))])
+    error_message = "Each entry must be a valid email address of the form local@domain."
   }
 }
 
-variable "folder_id" {
-  description = "Folder to create the projects under. Numeric ID (e.g. \"123456789\") or \"folders/123456789\"."
+variable "parent" {
+  description = "Parent for the created projects: \"organizations/<id>\" or \"folders/<id>\" (e.g. \"organizations/805624170808\" or \"folders/916995945005\")."
   type        = string
+
+  validation {
+    condition     = can(regex("^(organizations|folders)/[0-9]+$", var.parent))
+    error_message = "parent must be \"organizations/<numeric id>\" or \"folders/<numeric id>\"."
+  }
 }
 
 variable "billing_account" {
@@ -23,9 +35,28 @@ variable "billing_account" {
 }
 
 variable "prefix" {
-  description = "Name prefix for the projects. Keep the total project_id <= 30 chars."
+  description = "Name prefix for the projects. project_id is <prefix>-<firstlast>-<6 hex>; the firstlast fragment is truncated to keep the total <= 30 chars, so a shorter prefix leaves more room for names."
   type        = string
   default     = "workshop"
+
+  # project_id must start with a lowercase letter; also reserve room for the
+  # fragment + suffix: len(prefix) <= 30 - 8 - 1 = 21 (at least 1 fragment char).
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{0,20}$", var.prefix))
+    error_message = "prefix must start with a lowercase letter, contain only lowercase letters/digits/hyphens, and be <= 21 chars."
+  }
+}
+
+variable "attendee_role" {
+  description = <<-EOT
+    IAM role each attendee is granted on their own project. Defaults to editor,
+    which gives full resource control (create/delete/deploy) without IAM/billing
+    admin. Note: roles/owner CANNOT be granted to users outside the org's domain
+    via Terraform (GCP requires external owners to be invited and accept), so it
+    fails with ORG_MUST_INVITE_EXTERNAL_OWNERS for attendees external to the org.
+  EOT
+  type        = string
+  default     = "roles/editor"
 }
 
 variable "apis" {

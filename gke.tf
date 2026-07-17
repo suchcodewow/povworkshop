@@ -5,7 +5,7 @@
 resource "google_container_cluster" "primary" {
   for_each = toset(local.attendees)
 
-  project  = var.attendee_projects[each.key]
+  project  = local.attendee_projects[each.key]
   name     = "${var.prefix}-${each.key}"
   location = var.zone
 
@@ -24,7 +24,7 @@ resource "google_container_cluster" "primary" {
 
   # Workload Identity — the recommended way for pods to access GCP APIs.
   workload_identity_config {
-    workload_pool = "${var.attendee_projects[each.key]}.svc.id.goog"
+    workload_pool = "${local.attendee_projects[each.key]}.svc.id.goog"
   }
 
   release_channel {
@@ -45,7 +45,7 @@ resource "google_container_cluster" "primary" {
 resource "google_container_node_pool" "primary_nodes" {
   for_each = toset(local.attendees)
 
-  project  = var.attendee_projects[each.key]
+  project  = local.attendee_projects[each.key]
   name     = "${var.prefix}-${each.key}-pool"
   location = var.zone
   cluster  = google_container_cluster.primary[each.key].name

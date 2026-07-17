@@ -9,7 +9,9 @@ Per-project isolation means each attendee has their own network, quotas, IAM,
 Binary Authorization policy, and registry — no cross-attendee interference.
 This layer provisions *into* existing projects. To have Terraform **create**
 the projects too (billing + APIs), run the [`projects/`](projects/) factory
-layer first (intended for IT) and feed its `attendee_projects` output in here.
+layer first (intended for IT); this layer then reads its `attendee_projects`
+output automatically from that layer's state (via [`data.tf`](data.tf)) — no
+copy/paste.
 
 The configuration works with either **Terraform** or **OpenTofu** — the
 commands below show both. Pick one and use it consistently (don't mix state).
@@ -57,12 +59,17 @@ Per attendee, in that attendee's project:
 
 ## Configure attendees
 
-Copy the example and edit `attendee_projects` (one cluster per entry, in the
-mapped project):
+If you created the projects with the [`projects/`](projects/) factory layer,
+you don't configure attendees here at all — this layer reads its
+`attendee_projects` output straight from that layer's state (via
+[`data.tf`](data.tf)). Just leave `attendee_projects` unset and apply.
 
 ```sh
-cp terraform.tfvars.example terraform.tfvars
+cp terraform.tfvars.example terraform.tfvars   # set region/zone/prefix; leave attendee_projects unset
 ```
+
+To use projects created **outside** the factory instead, set the map explicitly
+(this overrides the auto-wire — one cluster per entry, in the mapped project):
 
 ```hcl
 attendee_projects = {

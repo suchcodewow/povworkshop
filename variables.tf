@@ -2,16 +2,16 @@ variable "attendee_projects" {
   description = <<-EOT
     Map of attendee identifier -> existing GCP project ID for that attendee.
     One cluster (and its own VPC, registry, node SA) is created in each project.
-    The attendee key must be a valid resource-name fragment: lowercase letters,
-    numbers, and hyphens. The projects must already exist, have billing linked,
-    and have the required APIs enabled (see README).
+
+    Leave this empty ({}, the default) to auto-populate from the projects/
+    factory layer's `attendee_projects` output (read via data.tf) — no
+    copy/paste needed. Set it explicitly only for projects created outside that
+    layer, in which case they must already exist, have billing linked, and have
+    the required APIs enabled (see README). The attendee key must be a valid
+    resource-name fragment: lowercase letters, numbers, and hyphens.
   EOT
   type        = map(string)
-
-  validation {
-    condition     = length(var.attendee_projects) > 0
-    error_message = "Provide at least one attendee -> project_id mapping."
-  }
+  default     = {}
 }
 
 variable "region" {

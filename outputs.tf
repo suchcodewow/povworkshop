@@ -19,7 +19,7 @@ output "get_credentials_commands" {
   description = "Per-attendee command to configure kubectl for their cluster."
   value = {
     for name, c in google_container_cluster.primary :
-    name => "gcloud container clusters get-credentials ${c.name} --zone ${var.zone} --project ${var.attendee_projects[name]}"
+    name => "gcloud container clusters get-credentials ${c.name} --zone ${var.zone} --project ${local.attendee_projects[name]}"
   }
 }
 
@@ -35,7 +35,7 @@ output "artifact_registry_repos" {
 
 output "attendee_projects" {
   description = "Map of attendee -> project ID."
-  value       = var.attendee_projects
+  value       = local.attendee_projects
 }
 
 output "region" {

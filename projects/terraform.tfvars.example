@@ -1,11 +1,12 @@
 # Copy to terraform.tfvars and fill in your values.
 
-folder_id       = "123456789"            # numeric folder ID (or "folders/123456789")
-billing_account = "0123AB-4567CD-89EF01" # your billing account ID
+parent          = "organizations/123456789" # "organizations/<id>" or "folders/<id>"
+billing_account = "0123AB-4567CD-89EF01"    # your billing account ID
 prefix          = "workshop"
 
-attendees = [
-  "alice",
-  "bob",
-  "carol",
+# Local part must be first.last; project names are derived as firstlast.
+attendee_emails = [
+  "alice.smith@example.com",
+  "bob.jones@example.com",
+  "carol.diaz@example.com",
 ]

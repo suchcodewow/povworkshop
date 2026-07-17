@@ -4,13 +4,13 @@ region = "us-central1"
 zone   = "us-central1-a"
 prefix = "workshop"
 
-# One cluster is created per entry, in that attendee's own (existing) project.
-# Key = attendee id (lowercase letters, numbers, hyphens); value = project ID.
-attendee_projects = {
-  alice = "ws-alice-1234"
-  bob   = "ws-bob-5678"
-  carol = "ws-carol-9012"
-}
+# attendee_projects is auto-populated from the projects/ factory layer's state
+# (see data.tf), so normally you leave it unset. Uncomment only to override with
+# projects created outside that layer (key = attendee id, value = project ID):
+# attendee_projects = {
+#   alice = "ws-alice-1234"
+#   bob   = "ws-bob-5678"
+# }
 
 # Workshop-friendly defaults (cheap, interruptible):
 preemptible    = true

@@ -5,7 +5,7 @@
 resource "google_compute_network" "vpc" {
   for_each = toset(local.attendees)
 
-  project                 = var.attendee_projects[each.key]
+  project                 = local.attendee_projects[each.key]
   name                    = "${var.prefix}-vpc"
   auto_create_subnetworks = false
 }
@@ -13,7 +13,7 @@ resource "google_compute_network" "vpc" {
 resource "google_compute_subnetwork" "subnet" {
   for_each = toset(local.attendees)
 
-  project = var.attendee_projects[each.key]
+  project = local.attendee_projects[each.key]
   name    = "${var.prefix}-subnet"
   region  = var.region
   network = google_compute_network.vpc[each.key].id

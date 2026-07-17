@@ -5,7 +5,7 @@
 resource "google_service_account" "node" {
   for_each = toset(local.attendees)
 
-  project = var.attendee_projects[each.key]
+  project = local.attendee_projects[each.key]
   # account_id must be 6-30 chars; keep attendee names short.
   account_id   = "${var.prefix}-${each.key}-node"
   display_name = "GKE node SA for ${each.key}"
@@ -33,7 +33,7 @@ locals {
 resource "google_project_iam_member" "node_sa" {
   for_each = local.node_role_bindings
 
-  project = var.attendee_projects[each.value.attendee]
+  project = local.attendee_projects[each.value.attendee]
   role    = each.value.role
   member  = "serviceAccount:${google_service_account.node[each.value.attendee].email}"
 }
