@@ -1,7 +1,7 @@
 # Read the clusters layer's state to discover attendees, the network, and the
 # per-attendee node tags — no need to redeclare any of it here.
 #
-# Default assumes the clusters layer uses LOCAL state (../terraform.tfstate).
+# Default assumes the clusters layer uses LOCAL state (../kubernetes/terraform.tfstate).
 # If it uses the GCS backend, replace the block below with:
 #
 #   data "terraform_remote_state" "clusters" {
@@ -15,7 +15,7 @@ data "terraform_remote_state" "clusters" {
   backend = "local"
 
   config = {
-    path = "../terraform.tfstate"
+    path = "../kubernetes/terraform.tfstate"
   }
 }
 

@@ -53,6 +53,6 @@ clusters with one workspace per attendee (a provider configured from a
 ## State note
 
 `data.tf` defaults to reading the clusters layer's **local** state at
-`../terraform.tfstate`. If you switch the clusters layer to the GCS backend,
+`../kubernetes/terraform.tfstate`. If you switch the clusters layer to the GCS backend,
 update both `data.tf` (the remote_state block) and `versions.tf` (this layer's
 own backend) accordingly — see the comments in those files.

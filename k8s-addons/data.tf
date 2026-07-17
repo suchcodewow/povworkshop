@@ -13,7 +13,7 @@ data "terraform_remote_state" "clusters" {
   backend = "local"
 
   config = {
-    path = "../terraform.tfstate"
+    path = "../kubernetes/terraform.tfstate"
   }
 }
 

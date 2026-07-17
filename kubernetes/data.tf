@@ -16,6 +16,6 @@ data "terraform_remote_state" "projects" {
 
   backend = "local"
   config = {
-    path = "${path.module}/projects/terraform.tfstate"
+    path = "${path.module}/../projects/terraform.tfstate"
   }
 }

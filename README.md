@@ -10,7 +10,7 @@ Binary Authorization policy, and registry — no cross-attendee interference.
 This layer provisions *into* existing projects. To have Terraform **create**
 the projects too (billing + APIs), run the [`projects/`](projects/) factory
 layer first (intended for IT); this layer then reads its `attendee_projects`
-output automatically from that layer's state (via [`data.tf`](data.tf)) — no
+output automatically from that layer's state (via [`data.tf`](kubernetes/data.tf)) — no
 copy/paste.
 
 The configuration works with either **Terraform** or **OpenTofu** — the
@@ -62,9 +62,13 @@ Per attendee, in that attendee's project:
 If you created the projects with the [`projects/`](projects/) factory layer,
 you don't configure attendees here at all — this layer reads its
 `attendee_projects` output straight from that layer's state (via
-[`data.tf`](data.tf)). Just leave `attendee_projects` unset and apply.
+[`data.tf`](kubernetes/data.tf)). Just leave `attendee_projects` unset and apply.
+
+The clusters layer lives in [`kubernetes/`](kubernetes/) — run its commands from
+there:
 
 ```sh
+cd kubernetes
 cp terraform.tfvars.example terraform.tfvars   # set region/zone/prefix; leave attendee_projects unset
 ```
 
@@ -81,6 +85,8 @@ attendee_projects = {
 ## Usage
 
 ```sh
+cd kubernetes
+
 # Terraform
 terraform init && terraform plan && terraform apply
 
@@ -91,9 +97,10 @@ tofu init && tofu plan && tofu apply
 ## Connect kubectl (hand these out to attendees)
 
 The apply prints a `get_credentials_commands` map — one command per attendee.
-View it any time with:
+View it any time from the clusters layer:
 
 ```sh
+cd kubernetes
 terraform output get_credentials_commands   # or: tofu output ...
 ```
 
@@ -106,9 +113,10 @@ kubectl get nodes
 ## Push images to an attendee's registry
 
 Each attendee has an Artifact Registry repo (matching the Binary Authorization
-allowlist, so images from it are admitted). Get the paths with:
+allowlist, so images from it are admitted). Get the paths from the clusters layer:
 
 ```sh
+cd kubernetes
 terraform output artifact_registry_repos   # or: tofu output ...
 ```
 
@@ -164,8 +172,8 @@ Tear down in reverse order — addons first, then clusters:
 
 ```sh
 cd k8s-addons && for a in alice bob carol; do tofu workspace select "$a" && tofu destroy -auto-approve; done && cd ..
-cd addons && terraform destroy && cd ..    # remove GCP-level addons
-terraform destroy                          # remove all clusters + network
+cd addons && terraform destroy && cd ..           # remove GCP-level addons
+cd kubernetes && terraform destroy && cd ..       # remove all clusters + network
 ```
 
 To remove a single attendee, delete their name from `attendees` and re-apply.

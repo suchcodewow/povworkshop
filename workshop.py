@@ -21,14 +21,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
-# Layers in apply order. `dir` is relative to this repo root; the root/clusters
-# layer is "." . `per_attendee` layers use one workspace per attendee.
+# Layers in apply order. `dir` is relative to this repo root; each layer lives
+# in its own subfolder. `per_attendee` layers use one workspace per attendee.
 LAYERS = [
     {"key": "projects", "dir": "projects", "name": "Projects  (attendee GCP projects, run first)"},
-    {"key": "clusters", "dir": ".", "name": "Clusters  (GKE + network + registry)"},
+    {"key": "clusters", "dir": "kubernetes", "name": "Clusters  (GKE + network + registry)"},
     {"key": "addons", "dir": "addons", "name": "Add-ons   (firewall, Binary Authorization)"},
     {"key": "k8s", "dir": "k8s-addons", "name": "K8s add-ons (in-cluster, per attendee)", "per_attendee": True},
 ]
+
+# Directory of the clusters layer (used directly when reading its state/outputs).
+CLUSTERS_DIR = (ROOT / "kubernetes").resolve()
 
 def tf_bin() -> str:
     """Resolve the Terraform binary: $TF_BIN, then tofu, then terraform."""
@@ -79,7 +82,7 @@ def ensure_init(layer: dict) -> bool:
 
 def get_attendees() -> list[str]:
     """Read the attendee list from the clusters layer's `attendees` output."""
-    code, out = capture(["output", "-json", "attendees"], ROOT)
+    code, out = capture(["output", "-json", "attendees"], CLUSTERS_DIR)
     if code != 0 or not out.strip():
         return []
     try:
@@ -96,7 +99,7 @@ def get_attendee_projects() -> dict[str, str]:
     output survives (those projects are protected), and orphaned clusters may
     still exist in GCP exactly in that situation.
     """
-    for chdir in (ROOT, (ROOT / "projects").resolve()):
+    for chdir in (CLUSTERS_DIR, (ROOT / "projects").resolve()):
         code, out = capture(["output", "-json", "attendee_projects"], chdir)
         if code == 0 and out.strip():
             try:
@@ -194,7 +197,7 @@ def cleanup_orphans() -> None:
               "layers first, or nothing to check.")
         return
 
-    tracked = set(capture(["state", "list"], ROOT)[1].splitlines())
+    tracked = set(capture(["state", "list"], CLUSTERS_DIR)[1].splitlines())
 
     orphans: list[tuple[str, str, str]] = []  # (project, cluster_name, location)
     for attendee, project in projects.items():
