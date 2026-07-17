@@ -21,3 +21,30 @@ resource "harness_platform_organization" "workshop" {
     }
   }
 }
+
+locals {
+  # firstlast identifier -> email. Mirrors the projects/ layer's derivation
+  # (replace(lower(local-part), ".", "")) so each Harness project's identifier
+  # lines up with that attendee's GCP project (e.g. "shawnpearson").
+  attendees = {
+    for email in var.attendee_emails :
+    replace(lower(split("@", email)[0]), ".", "") => email
+  }
+
+  # First + last name from the email local part:
+  # "shawn.pearson@harness.io" -> "Shawn Pearson".
+  attendee_names = {
+    for key, email in local.attendees :
+    key => join(" ", [for part in split(".", split("@", email)[0]) : title(part)])
+  }
+}
+
+# One Harness project per attendee, inside the workshop org. Depends on the org
+# implicitly via org_id, so Terraform creates the org first.
+resource "harness_platform_project" "attendee" {
+  for_each = local.attendees
+
+  identifier = each.key
+  name       = local.attendee_names[each.key]
+  org_id     = harness_platform_organization.workshop.id
+}

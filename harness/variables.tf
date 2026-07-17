@@ -41,6 +41,22 @@ variable "org_identifier" {
   }
 }
 
+variable "attendee_emails" {
+  description = <<-EOT
+    Attendee email addresses — one Harness project is created per email, matching
+    the attendees the projects/ GCP layer creates a project for. Normally supplied
+    via TF_VAR_attendee_emails from Secret Manager (the same "attendee-emails"
+    secret the GCP layers use). Each local part must be "first.last".
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for e in var.attendee_emails : can(regex("^[^@]+@[^@]+$", e))])
+    error_message = "Each entry must be a valid email address of the form local@domain."
+  }
+}
+
 variable "org_name" {
   description = <<-EOT
     Display name for the workshop organization. Leave null to auto-generate as
