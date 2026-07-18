@@ -550,16 +550,28 @@ def show_outputs() -> None:
 
 # --- menu -------------------------------------------------------------------
 
-def build_menu() -> list[tuple[str, callable]]:
-    items: list[tuple[str, callable]] = []
+def build_menu() -> list[tuple[str, callable | None]]:
+    """Menu entries as (label, action). A None action marks a section header
+    (printed but not selectable). Build options come first, then teardown, then
+    utilities — so there's no interleaving of apply/destroy while building."""
+    items: list[tuple[str, callable | None]] = []
+
+    # --- Build (plan & apply) ---
+    items.append(("--- Build (plan & apply) ---", None))
     for layer in LAYERS:
-        # `apply` runs a plan and shows it before prompting, so "plan & apply"
-        # is a single step. destroy stays separate.
-        for label, action in (("plan & apply", "apply"), ("destroy", "destroy")):
-            items.append((f"{layer['name']:<44s} {label}",
-                          lambda l=layer, a=action: act(l, a)))
+        items.append((f"{layer['name']:<44s} plan & apply",
+                      lambda l=layer: act(l, "apply")))
     items.append(("ALL: apply  (harness -> projects -> clusters -> addons -> k8s)", lambda: apply_all()))
+
+    # --- Tear down (destroy) ---
+    items.append(("--- Tear down (destroy) ---", None))
+    for layer in LAYERS:
+        items.append((f"{layer['name']:<44s} destroy",
+                      lambda l=layer: act(l, "destroy")))
     items.append(("ALL: destroy (k8s -> addons -> clusters -> harness)", lambda: destroy_all()))
+
+    # --- Utilities ---
+    items.append(("--- Utilities ---", None))
     items.append(("Clean up orphaned clusters (delete GKE clusters not in state)", lambda: cleanup_orphans()))
     items.append(("Show outputs for a layer", lambda: show_outputs()))
     items.append(("Manage secrets (push secrets.local.env -> Secret Manager)", lambda: manage_secrets()))
@@ -575,17 +587,25 @@ def main() -> None:
     items = build_menu()
     while True:
         print(f"\n=== Workshop Terraform ({BIN}) — auto-approve ===")
-        for i, (label, _) in enumerate(items, 1):
-            print(f"  {i:2d}) {label}")
-        print("   q) Quit")
+        # Number only selectable items; headers (action is None) print plainly.
+        actions: dict[int, callable] = {}
+        n = 0
+        for label, action in items:
+            if action is None:
+                print(f"\n  {label}")
+            else:
+                n += 1
+                actions[n] = action
+                print(f"  {n:2d}) {label}")
+        print("\n   q) Quit")
         choice = input("\nSelect: ").strip().lower()
         if choice in ("q", "quit", "exit"):
             return
-        if not choice.isdigit() or not (1 <= int(choice) <= len(items)):
+        if not choice.isdigit() or int(choice) not in actions:
             print("!! invalid choice")
             continue
         try:
-            items[int(choice) - 1][1]()
+            actions[int(choice)]()
         except KeyboardInterrupt:
             print("\n(interrupted — back to menu)")
 
