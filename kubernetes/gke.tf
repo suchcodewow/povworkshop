@@ -22,6 +22,19 @@ resource "google_container_cluster" "primary" {
     services_secondary_range_name = "services"
   }
 
+  # Private nodes (no external IPs) so node<->control-plane traffic goes over the
+  # private peering path, NOT public egress. This keeps the cluster healthy even
+  # when the addon egress firewall denies general internet — without it, blocking
+  # egress cuts kubelet off from the (public) control plane and nodes go
+  # NotReady. Public control-plane ENDPOINT is kept (enable_private_endpoint =
+  # false) so attendees' kubectl still reaches it. The master range sits inside
+  # 192.168.0.0/16, which the addon's allow-internal-egress rule permits.
+  private_cluster_config {
+    enable_private_nodes    = true
+    enable_private_endpoint = false
+    master_ipv4_cidr_block  = "192.168.0.0/28"
+  }
+
   # Workload Identity — the recommended way for pods to access GCP APIs.
   workload_identity_config {
     workload_pool = "${local.attendee_projects[each.key]}.svc.id.goog"
@@ -49,6 +62,14 @@ resource "google_container_node_pool" "primary_nodes" {
   name     = "${var.prefix}-${each.key}-pool"
   location = var.zone
   cluster  = google_container_cluster.primary[each.key].name
+
+  # Private nodes reach Google (incl. image registries) only via the restricted
+  # VIP + private DNS, so make sure those exist before nodes boot.
+  depends_on = [
+    google_dns_record_set.apex_a,
+    google_dns_record_set.wildcard_cname,
+    google_compute_route.restricted_vip,
+  ]
 
   node_count = var.node_count
 

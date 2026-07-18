@@ -102,5 +102,6 @@ variable "apis" {
     "container.googleapis.com",
     "artifactregistry.googleapis.com",
     "binaryauthorization.googleapis.com",
+    "dns.googleapis.com", # private DNS zones routing Google domains to the restricted VIP
   ]
 }
