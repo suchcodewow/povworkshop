@@ -75,17 +75,6 @@ resource "google_project_iam_member" "attendee_admin" {
   member  = "user:${each.value}"
 }
 
-# Kubernetes Engine Admin so attendees can manage cluster-scoped RBAC on their
-# own cluster — e.g. the ClusterRoleBindings the Harness delegate creates.
-# roles/editor lacks container.clusterRoleBindings.create, which GKE requires.
-resource "google_project_iam_member" "attendee_gke_admin" {
-  for_each = local.attendees
-
-  project = google_project.attendee[each.key].project_id
-  role    = "roles/container.admin"
-  member  = "user:${each.value}"
-}
-
 # Operator SA: owner on every attendee project, so the impersonated workshop
 # runs can fully manage resources in them (registries + their IAM, networks,
 # GKE, node SAs + bindings). Scoped to attendee projects, not the org. Skipped

@@ -33,6 +33,7 @@ LAYERS = [
     {"key": "harness", "dir": "harness", "name": "Harness   (workshop organization)",
      "requires": ["HARNESS_ACCOUNT_ID", "HARNESS_PLATFORM_API_KEY"]},
     {"key": "projects", "dir": "projects", "name": "Projects  (attendee GCP projects)"},
+    {"key": "access", "dir": "cluster-access", "name": "Cluster access (attendee GKE-admin IAM)"},
     {"key": "clusters", "dir": "kubernetes", "name": "Clusters  (GKE + network + registry)"},
     {"key": "addons", "dir": "addons", "name": "Add-ons   (firewall, Binary Authorization)"},
     {"key": "k8s", "dir": "k8s-addons", "name": "K8s add-ons (in-cluster, per attendee)", "per_attendee": True},
@@ -565,14 +566,14 @@ def build_menu() -> list[tuple[str, callable | None]]:
     for layer in LAYERS:
         items.append((f"{layer['name']:<44s} plan & apply",
                       lambda l=layer: act(l, "apply")))
-    items.append(("ALL: apply  (harness -> projects -> clusters -> addons -> k8s)", lambda: apply_all()))
+    items.append(("ALL: apply  (harness -> projects -> access -> clusters -> addons -> k8s)", lambda: apply_all()))
 
     # --- Tear down (destroy) ---
     items.append(("--- Tear down (destroy) ---", None))
     for layer in LAYERS:
         items.append((f"{layer['name']:<44s} destroy",
                       lambda l=layer: act(l, "destroy")))
-    items.append(("ALL: destroy (k8s -> addons -> clusters -> harness)", lambda: destroy_all()))
+    items.append(("ALL: destroy (k8s -> addons -> clusters -> access -> harness)", lambda: destroy_all()))
 
     # --- Utilities ---
     items.append(("--- Utilities ---", None))
