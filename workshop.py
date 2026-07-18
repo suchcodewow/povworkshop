@@ -442,6 +442,26 @@ def cleanup_orphans() -> None:
     print("\nDone. Now run a destroy (option for the clusters layer, or ALL: destroy).")
 
 
+def show_identity() -> None:
+    """Show which identity a run will use — your gcloud account and, if set, the
+    operator service account being impersonated for Terraform + gcloud."""
+    if not shutil.which("gcloud"):
+        print("!! gcloud not found on PATH.")
+        return
+    code, out, _ = gcloud_capture(
+        ["auth", "list", "--filter=status:ACTIVE", "--format=value(account)"])
+    active = out.strip() if code == 0 else ""
+    print("\n=== Identity for this run ===")
+    print(f"  gcloud active account : {active or '(none — run: gcloud auth login)'}")
+    if IMPERSONATE_SA:
+        print(f"  impersonating SA      : {IMPERSONATE_SA}")
+        print("    -> Terraform (google provider) and gcloud act AS this SA.")
+        print("       Your active account needs roles/iam.serviceAccountTokenCreator on it.")
+    else:
+        print("  impersonating SA      : (none — using your own ADC)")
+    print(f"  operator project      : {OPERATOR_PROJECT or '(unset)'}")
+
+
 def show_outputs() -> None:
     print("\nWhich layer's outputs?")
     for i, layer in enumerate(LAYERS, 1):
@@ -468,6 +488,7 @@ def build_menu() -> list[tuple[str, callable]]:
     items.append(("Show outputs for a layer", lambda: show_outputs()))
     items.append(("Manage secrets (push secrets.local.env -> Secret Manager)", lambda: manage_secrets()))
     items.append(("Reload secrets from Secret Manager", lambda: load_secrets()))
+    items.append(("Show current identity (gcloud account / impersonation)", lambda: show_identity()))
     return items
 
 
