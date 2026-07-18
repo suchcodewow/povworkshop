@@ -36,6 +36,7 @@ LAYERS = [
     {"key": "clusters", "dir": "kubernetes", "name": "Clusters  (GKE + network + registry)"},
     {"key": "addons", "dir": "addons", "name": "Add-ons   (firewall, Binary Authorization)"},
     {"key": "k8s", "dir": "k8s-addons", "name": "K8s add-ons (in-cluster, per attendee)", "per_attendee": True},
+    {"key": "trivy", "dir": "trivy", "name": "Trivy     (standalone shared scanner project)", "standalone": True},
 ]
 
 # Directory of the clusters layer (used directly when reading its state/outputs).
@@ -330,8 +331,14 @@ def act(layer: dict, action: str) -> int:
 
 
 def apply_all() -> None:
-    """Apply every layer in order; stop at the first failure."""
+    """Apply every layer in order; stop at the first failure.
+
+    `standalone` layers (e.g. trivy) are skipped — they have independent
+    lifecycles and are applied on their own from the menu.
+    """
     for layer in LAYERS:
+        if layer.get("standalone"):
+            continue
         print(f"\n########## APPLY: {layer['key']} ##########")
         if act(layer, "apply") != 0:
             print(f"\n!! stopping — {layer['key']} apply failed.")
@@ -340,8 +347,11 @@ def apply_all() -> None:
 
 
 def destroy_all() -> None:
-    """Destroy in reverse order. Skips `projects` (deletion is protected)."""
+    """Destroy in reverse order. Skips `projects` (protected) and `standalone`
+    layers (independent lifecycle — destroy them on their own)."""
     for layer in reversed(LAYERS):
+        if layer.get("standalone"):
+            continue
         if layer["key"] == "projects":
             print("\n(skipping projects destroy — projects are protected; "
                   "remove them manually or set deletion_policy = DELETE.)")

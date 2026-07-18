@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in.
+#
+# parent and billing_account normally come from Secret Manager via workshop.py
+# (TF_VAR_parent / TF_VAR_billing_account) — leave them unset when running that
+# way. Uncomment to set explicitly for a bare `tofu` run:
+# parent          = "organizations/123456789"
+# billing_account = "0123AB-4567CD-89EF01"
+
+region = "us-central1"
+zone   = "us-central1-a"
+prefix = "trivy"
+
+# REQUIRED: who may reach the Trivy server port. Restrict to the public source
+# IPs attendees connect from (laptop IPs, Cloud Shell egress, a NAT IP). Use
+# ["0.0.0.0/0"] only for a fully-open, short-lived workshop.
+allowed_source_ranges = [
+  # "203.0.113.10/32",
+]
+
+trivy_port  = 4954
+preemptible = false
+# trivy_image = "aquasec/trivy:0.60.0"   # pin a version for reproducibility
