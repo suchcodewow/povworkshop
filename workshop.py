@@ -97,9 +97,57 @@ def configure_impersonation() -> None:
     """
     if not IMPERSONATE_SA:
         return
+    print(f"(impersonating service account: {IMPERSONATE_SA})")
+    # Preflight BEFORE setting the impersonation env vars, so the ADC check below
+    # tests the raw source credential rather than an impersonated one.
+    _preflight_impersonation()
     os.environ.setdefault("GOOGLE_IMPERSONATE_SERVICE_ACCOUNT", IMPERSONATE_SA)
     os.environ.setdefault("CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT", IMPERSONATE_SA)
-    print(f"(impersonating service account: {IMPERSONATE_SA})")
+
+
+def _preflight_impersonation() -> None:
+    """Confirm impersonation will actually work, with a clear hint if not.
+
+    Impersonation offloads GCP calls to the SA, but the *source* credential must
+    be valid enough to mint the SA token first. Terraform's google provider
+    impersonates from ADC (`application-default`), which is a DIFFERENT
+    credential from the gcloud CLI login — so a fresh gcloud login isn't enough
+    if ADC is reauth-expired (the usual invalid_rapt cause). Check both:
+      (a) ADC itself is usable  (what Terraform impersonates FROM), and
+      (b) the SA token can be minted (confirms the token-creator grant).
+    Tokens are discarded, never printed.
+    """
+    if not shutil.which("gcloud"):
+        return
+
+    # (a) ADC health — the credential Terraform uses. Test it raw.
+    code, _t, err = gcloud_capture(["auth", "application-default", "print-access-token"])
+    err = (err or "").strip()
+    if code != 0:
+        tail = err.splitlines()[-1] if err else f"exit {code}"
+        print(f"!! ADC (used by Terraform) is not usable: {tail}")
+        if "invalid_rapt" in err or "reauth" in err.lower():
+            print("   Reauthenticate, then retry:  gcloud auth application-default login")
+        else:
+            print("   Set it up:  gcloud auth application-default login")
+        print("   (google-provider layers will fail until this is fixed.)")
+        return
+
+    # (b) Can we mint a token for the SA? Confirms the token-creator grant.
+    code, _t2, err2 = gcloud_capture(
+        ["auth", "print-access-token", "--impersonate-service-account", IMPERSONATE_SA])
+    if code == 0:
+        print("(impersonation preflight OK — ADC valid, SA token minted)")
+        return
+    err2 = (err2 or "").strip()
+    tail2 = err2.splitlines()[-1] if err2 else f"exit {code}"
+    print(f"!! cannot mint a token for {IMPERSONATE_SA}")
+    if any(s in err2.lower() for s in ("permission", "denied", "forbidden", "token creator")):
+        print("   Your account likely lacks roles/iam.serviceAccountTokenCreator on the SA.")
+    if "invalid_rapt" in err2 or "reauth" in err2.lower():
+        print("   Or reauthenticate:  gcloud auth login")
+    print(f"   {tail2}")
+    print("   (google-provider layers will fail until this is fixed.)")
 
 
 def tf_bin() -> str:
