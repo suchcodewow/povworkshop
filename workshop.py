@@ -171,13 +171,41 @@ def layer_dir(layer: dict) -> Path:
     return (ROOT / layer["dir"]).resolve()
 
 
-def run(args: list[str], chdir: Path) -> int:
-    """Run BIN with -chdir=<chdir> and the given args; stream output live."""
+def run(args: list[str], chdir: Path, quiet: bool = False) -> int:
+    """Run BIN with -chdir=<chdir> and the given args.
+
+    Normally streams output live. In quiet mode (used for plan/apply/destroy),
+    capture the output and surface only what matters: the Terraform Error block
+    on failure, or a one-line summary on success. Set WORKSHOP_VERBOSE=1 to
+    force full streaming everywhere (for debugging).
+    """
+    quiet = quiet and not os.environ.get("WORKSHOP_VERBOSE")
     cmd = [BIN, f"-chdir={chdir}", *args]
+    if quiet:
+        cmd.append("-no-color")  # keep captured text clean
     print(f"\n$ {' '.join(cmd)}\n")
-    result = subprocess.run(cmd)
+
+    if not quiet:
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            print(f"\n!! command exited with status {result.returncode}")
+        return result.returncode
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    out = result.stdout or ""
+    err = result.stderr or ""
     if result.returncode != 0:
+        # Terraform writes Error:/Warning: blocks to stderr; fall back to the
+        # tail of stdout if stderr is empty.
+        print((err.strip() or "\n".join(out.strip().splitlines()[-20:])))
         print(f"\n!! command exited with status {result.returncode}")
+    else:
+        summary = [ln for ln in out.splitlines()
+                   if ln.startswith(("Apply complete!", "Destroy complete!",
+                                     "Plan:", "No changes.", "Changes to Outputs"))]
+        print("\n".join(summary) if summary else "(done)")
+        if err.strip():  # surface warnings even on success
+            print(err.strip())
     return result.returncode
 
 
@@ -392,7 +420,7 @@ def act(layer: dict, action: str) -> int:
     extra = APPROVE if action in ("apply", "destroy") else []
 
     if not layer.get("per_attendee"):
-        return run([action, *extra], d)
+        return run([action, *extra], d, quiet=True)
 
     attendees = get_attendees()
     if not attendees:
@@ -405,7 +433,7 @@ def act(layer: dict, action: str) -> int:
         if select_workspace(d, a) != 0:
             rc = 1
             continue
-        if run([action, *extra], d) != 0:
+        if run([action, *extra], d, quiet=True) != 0:
             rc = 1
     return rc
 
