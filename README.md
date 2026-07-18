@@ -107,6 +107,13 @@ account: …)` and no more reauth prompts. Leave it empty to use your own ADC.
 > The SA impersonates for GCP only. The Harness layer uses the Harness provider
 > (its own token), so it's unaffected.
 
+The org roles above let the SA **create** projects and set IAM, but not manage
+resources in projects it didn't create. So the `projects/` factory also grants
+the operator SA `roles/owner` on **each attendee project** (via
+`TF_VAR_operator_service_account`, set automatically by workshop.py). Apply
+`projects` once after enabling impersonation so existing attendee projects get
+that binding, then the other layers can manage their resources.
+
 ## Prerequisites
 
 1. Install either [Terraform](https://developer.hashicorp.com/terraform/install) (>= 1.5)

@@ -104,6 +104,9 @@ def configure_impersonation() -> None:
     _preflight_impersonation()
     os.environ.setdefault("GOOGLE_IMPERSONATE_SERVICE_ACCOUNT", IMPERSONATE_SA)
     os.environ.setdefault("CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT", IMPERSONATE_SA)
+    # Let the projects factory grant this SA owner on each attendee project, so
+    # impersonated runs can manage resources in projects it didn't create.
+    os.environ.setdefault("TF_VAR_operator_service_account", IMPERSONATE_SA)
 
 
 def _preflight_impersonation() -> None:

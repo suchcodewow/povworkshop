@@ -35,6 +35,25 @@ variable "shared_editor_emails" {
   }
 }
 
+variable "operator_service_account" {
+  description = <<-EOT
+    Operator service account email that runs the workshop (via impersonation).
+    When set, it's granted roles/owner on EVERY attendee project so the
+    impersonated runs can manage their resources (registries, clusters, node SAs
+    and IAM) — needed because attendee projects may have been created by a
+    different identity. Supplied automatically by workshop.py
+    (TF_VAR_operator_service_account) when impersonation is configured; leave
+    null to skip the grant.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.operator_service_account == null || can(regex("^[^@]+@[^@]+\\.iam\\.gserviceaccount\\.com$", var.operator_service_account))
+    error_message = "operator_service_account must be a service account email (…@….iam.gserviceaccount.com)."
+  }
+}
+
 variable "parent" {
   description = "Parent for the created projects: \"organizations/<id>\" or \"folders/<id>\" (e.g. \"organizations/805624170808\" or \"folders/916995945005\")."
   type        = string

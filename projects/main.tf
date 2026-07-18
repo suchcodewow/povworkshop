@@ -75,6 +75,18 @@ resource "google_project_iam_member" "attendee_admin" {
   member  = "user:${each.value}"
 }
 
+# Operator SA: owner on every attendee project, so the impersonated workshop
+# runs can fully manage resources in them (registries + their IAM, networks,
+# GKE, node SAs + bindings). Scoped to attendee projects, not the org. Skipped
+# when var.operator_service_account is null (i.e. not using impersonation).
+resource "google_project_iam_member" "operator_owner" {
+  for_each = var.operator_service_account == null ? {} : local.attendees
+
+  project = google_project.attendee[each.key].project_id
+  role    = "roles/owner"
+  member  = "serviceAccount:${var.operator_service_account}"
+}
+
 # Shared editors: editor on every attendee project, no project of their own.
 # Uses setproduct(attendees × emails) so each shared editor is bound in each
 # attendee project via the additive *_member (won't clobber other IAM).
