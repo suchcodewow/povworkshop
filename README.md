@@ -62,6 +62,51 @@ The mapping of env var → secret name lives in
 shell overrides the stored one, and Terraform reads list-typed vars (e.g.
 `TF_VAR_attendee_emails`) from the env as HCL/JSON.
 
+## Service-account impersonation (avoids reauth)
+
+User logins are subject to the org's reauthentication policy, so long or
+unattended runs can fail mid-plan with `invalid_grant / invalid_rapt`. Service
+accounts aren't subject to that policy. Point the workshop at an operator SA and
+`workshop.py` impersonates it for **both** Terraform (the `google` provider) and
+gcloud — no provider edits, no org-policy change.
+
+**One-time setup** (run as a user with the rights to create the SA and grant
+org/folder roles):
+
+```sh
+OP_PROJECT=administration-459416          # the operator project (holds secrets)
+SA=workshop-operator@$OP_PROJECT.iam.gserviceaccount.com
+PARENT=organizations/805624170808         # your org (or folders/<id>)
+
+# 1. Create the operator SA
+gcloud iam service-accounts create workshop-operator \
+  --project "$OP_PROJECT" --display-name "Workshop operator"
+
+# 2. Let YOUR user mint tokens for it (this is what enables impersonation)
+gcloud iam service-accounts add-iam-policy-binding "$SA" \
+  --project "$OP_PROJECT" \
+  --member "user:$(gcloud config get-value account)" \
+  --role roles/iam.serviceAccountTokenCreator
+
+# 3. Grant the SA what the layers need at the org/folder level
+for ROLE in roles/resourcemanager.projectCreator roles/billing.user \
+            roles/resourcemanager.projectIamAdmin roles/serviceusage.serviceUsageAdmin; do
+  gcloud organizations add-iam-policy-binding "${PARENT#organizations/}" \
+    --member "serviceAccount:$SA" --role "$ROLE"
+done
+# 4. Let the SA read the workshop secrets
+gcloud projects add-iam-policy-binding "$OP_PROJECT" \
+  --member "serviceAccount:$SA" --role roles/secretmanager.secretAccessor
+```
+
+Then set it once in [`workshop.config.json`](workshop.config.json)
+(`"operator_service_account": "<SA email>"`) or export
+`WORKSHOP_IMPERSONATE_SA`. On the next run you'll see `(impersonating service
+account: …)` and no more reauth prompts. Leave it empty to use your own ADC.
+
+> The SA impersonates for GCP only. The Harness layer uses the Harness provider
+> (its own token), so it's unaffected.
+
 ## Prerequisites
 
 1. Install either [Terraform](https://developer.hashicorp.com/terraform/install) (>= 1.5)

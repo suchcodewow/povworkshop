@@ -70,6 +70,38 @@ CONFIG = load_config()
 SECRETS: dict[str, str] = CONFIG.get("secrets", {})       # env var -> secret name
 OPERATOR_PROJECT: str | None = CONFIG.get("operator_project")
 
+# Optional operator service account to impersonate. WORKSHOP_IMPERSONATE_SA
+# overrides workshop.config.json's "operator_service_account". A placeholder
+# ("REPLACE...") or empty value means "don't impersonate".
+IMPERSONATE_SA: str | None = (
+    os.environ.get("WORKSHOP_IMPERSONATE_SA")
+    or CONFIG.get("operator_service_account")
+    or None
+)
+if IMPERSONATE_SA and "REPLACE" in IMPERSONATE_SA:
+    IMPERSONATE_SA = None
+
+
+def configure_impersonation() -> None:
+    """Impersonate the operator service account (if configured) for BOTH
+    Terraform's google provider and gcloud, so runs use the SA's identity rather
+    than the user's. This avoids user reauth (invalid_rapt) and matches the
+    central-operator model.
+
+    Sets the env vars both tools already understand — no provider edits needed:
+      GOOGLE_IMPERSONATE_SERVICE_ACCOUNT      -> terraform-provider-google
+      CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT -> gcloud
+
+    Requires the caller's ADC identity to have roles/iam.serviceAccountTokenCreator
+    on the target SA. If nothing is configured, runs use the user's own ADC.
+    """
+    if not IMPERSONATE_SA:
+        return
+    os.environ.setdefault("GOOGLE_IMPERSONATE_SERVICE_ACCOUNT", IMPERSONATE_SA)
+    os.environ.setdefault("CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT", IMPERSONATE_SA)
+    print(f"(impersonating service account: {IMPERSONATE_SA})")
+
+
 def tf_bin() -> str:
     """Resolve the Terraform binary: $TF_BIN, then tofu, then terraform."""
     override = os.environ.get("TF_BIN")
@@ -440,6 +472,7 @@ def build_menu() -> list[tuple[str, callable]]:
 
 
 def main() -> None:
+    configure_impersonation()
     load_secrets()
     set_derived_vars()
     items = build_menu()
