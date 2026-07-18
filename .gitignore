@@ -73,3 +73,6 @@ service-account*.json
 # One-time bootstrap file for pushing secrets to Secret Manager — never commit.
 secrets.local.env
 *.local.env
+
+# Personal Claude Code settings (permissions, etc.) — not shared.
+.claude/settings.local.json
