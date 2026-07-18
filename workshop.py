@@ -37,6 +37,7 @@ LAYERS = [
     {"key": "addons", "dir": "addons", "name": "Add-ons   (firewall, Binary Authorization)"},
     {"key": "k8s", "dir": "k8s-addons", "name": "K8s add-ons (in-cluster, per attendee)", "per_attendee": True},
     {"key": "trivy", "dir": "trivy", "name": "Trivy     (standalone shared scanner project)", "standalone": True},
+    {"key": "zap", "dir": "zap", "name": "OWASP ZAP (standalone DAST scanner project)", "standalone": True},
 ]
 
 # Directory of the clusters layer (used directly when reading its state/outputs).
