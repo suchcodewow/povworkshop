@@ -12,12 +12,14 @@ resource "google_service_account" "node" {
 }
 
 locals {
-  # Minimal roles GKE nodes need for logging, monitoring, and metadata.
+  # GKE's recommended baseline role for custom node service accounts. It
+  # consolidates the logging/monitoring/metadata permissions nodes need (plus
+  # autoscaling metrics), and clears the NODE_SA_MISSING_PERMISSIONS
+  # recommendation ("Grant roles/container.defaultNodeServiceAccount ... for
+  # non-degraded operations"). Artifact Registry read is granted separately in
+  # artifact_registry.tf.
   node_sa_roles = [
-    "roles/logging.logWriter",
-    "roles/monitoring.metricWriter",
-    "roles/monitoring.viewer",
-    "roles/stackdriver.resourceMetadata.writer",
+    "roles/container.defaultNodeServiceAccount",
   ]
 
   # attendee × role -> one binding each (in the attendee's own project).
