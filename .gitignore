@@ -18,6 +18,10 @@ crash.*.log
 *.tfvars.json
 # Keep the example vars file, which is safe to commit
 !*.tfvars.example
+# Committed non-secret layer config (region/zone/prefix/sizes). Auto-loaded by
+# Terraform so a fresh clone runs without recreating tfvars. Never put
+# secret-sourced values here — *.auto.tfvars overrides TF_VAR_* from Secret Manager.
+!*.auto.tfvars
 
 # Ignore override files as they are usually used to override resources
 # locally and so are not checked in
