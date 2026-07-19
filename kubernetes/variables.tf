@@ -55,3 +55,17 @@ variable "preemptible" {
   type        = bool
   default     = true
 }
+
+variable "enable_nat" {
+  description = <<-EOT
+    Create a Cloud NAT so pods on the private nodes can reach the internet.
+
+    Nodes are private (no external IPs), so without NAT they have no route to
+    the internet at all. Keep this true so the baseline cluster works normally
+    (e.g. a Harness delegate can reach app.harness.io) and the addons/ egress
+    firewall is what deliberately takes internet away. Set false to have the
+    cluster be internet-isolated on its own.
+  EOT
+  type        = bool
+  default     = true
+}

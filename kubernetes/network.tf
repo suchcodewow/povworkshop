@@ -36,6 +36,42 @@ resource "google_compute_subnetwork" "subnet" {
 }
 
 # ---------------------------------------------------------------------------
+# Cloud NAT — outbound internet for the private nodes.
+#
+# Nodes have no external IPs (private_cluster_config in gke.tf), so without NAT
+# pods have no path to the internet at all. With it, the baseline cluster
+# behaves normally and the addons/ egress firewall is what deliberately removes
+# internet access (its deny rule still wins over NAT). NAT covers the pod
+# secondary range too via ALL_SUBNETWORKS_ALL_IP_RANGES.
+# ---------------------------------------------------------------------------
+
+resource "google_compute_router" "router" {
+  for_each = var.enable_nat ? toset(local.attendees) : toset([])
+
+  project = local.attendee_projects[each.key]
+  name    = "${var.prefix}-router"
+  region  = var.region
+  network = google_compute_network.vpc[each.key].id
+}
+
+resource "google_compute_router_nat" "nat" {
+  for_each = var.enable_nat ? toset(local.attendees) : toset([])
+
+  project = local.attendee_projects[each.key]
+  name    = "${var.prefix}-nat"
+  region  = var.region
+  router  = google_compute_router.router[each.key].name
+
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  log_config {
+    enable = false
+    filter = "ERRORS_ONLY"
+  }
+}
+
+# ---------------------------------------------------------------------------
 # Restricted Google API access for private nodes.
 #
 # With private nodes (no external IPs) and the addon egress firewall denying

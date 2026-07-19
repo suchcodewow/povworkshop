@@ -13,3 +13,8 @@ preemptible    = true
 machine_type   = "e2-standard-4"
 node_count     = 1
 max_node_count = 2
+
+# Nodes are private, so Cloud NAT is what gives pods internet. Leave true so the
+# baseline cluster works; the addons/ egress firewall is the thing that takes
+# internet away. Set false for an internet-isolated cluster without addons.
+enable_nat = true
