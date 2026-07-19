@@ -35,7 +35,7 @@ variable "prefix" {
 variable "machine_type" {
   description = "Machine type for node pool VMs."
   type        = string
-  default     = "e2-standard-2"
+  default     = "e2-standard-4"
 }
 
 variable "node_count" {
