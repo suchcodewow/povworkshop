@@ -179,12 +179,11 @@ def layer_dir(layer: dict) -> Path:
 def run(args: list[str], chdir: Path, quiet: bool = False) -> int:
     """Run BIN with -chdir=<chdir> and the given args.
 
-    Normally streams output live. In quiet mode (used for plan/apply/destroy),
-    capture the output and surface only what matters: the Terraform Error block
-    on failure, or a one-line summary on success. Set WORKSHOP_VERBOSE=1 to
-    force full streaming everywhere (for debugging).
+    Streams output live by default, so you can watch plan/apply/destroy progress
+    as it happens. Set WORKSHOP_QUIET=1 to collapse those to a one-line summary
+    instead (a failing run still prints the full Terraform Error block).
     """
-    quiet = quiet and not os.environ.get("WORKSHOP_VERBOSE")
+    quiet = quiet and bool(os.environ.get("WORKSHOP_QUIET"))
     cmd = [BIN, f"-chdir={chdir}", *args]
     if quiet:
         cmd.append("-no-color")  # keep captured text clean
