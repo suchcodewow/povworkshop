@@ -523,6 +523,51 @@ def cleanup_orphans() -> None:
     print("\nDone. Now run a destroy (option for the clusters layer, or ALL: destroy).")
 
 
+def _state_targets() -> list[Path]:
+    """Local Terraform state files/dirs across every layer.
+
+    Globs terraform.tfstate* so it catches the state, its .backup, the
+    timestamped terraform.tfstate.<epoch>.backup files Terraform leaves behind,
+    and the terraform.tfstate.d/ workspace directory (per-attendee layers).
+    """
+    targets: list[Path] = []
+    for layer in LAYERS:
+        targets.extend(sorted(layer_dir(layer).glob("terraform.tfstate*")))
+    return targets
+
+
+def delete_all_state() -> None:
+    """Delete every layer's local Terraform state. DESTRUCTIVE.
+
+    This only makes Terraform FORGET its resources — it deletes nothing in GCP
+    or Harness. Anything still running is left orphaned (and still billing), so
+    destroy the layers first if you want the resources gone. Use this to reset
+    after a teardown, or when state has drifted beyond repair.
+    """
+    targets = _state_targets()
+    if not targets:
+        print("No Terraform state files found — nothing to delete.")
+        return
+
+    print("\n!! This deletes local Terraform state for:")
+    for p in targets:
+        print(f"     {p.relative_to(ROOT)}")
+    print("\n   Terraform will FORGET these resources. Nothing in GCP/Harness is")
+    print("   deleted — live infrastructure becomes orphaned and keeps billing.")
+    print("   Destroy the layers first if you want the resources removed.")
+    if input("\n   Type DELETE to confirm: ").strip() != "DELETE":
+        print("(aborted — nothing deleted)")
+        return
+
+    for p in targets:
+        try:
+            shutil.rmtree(p) if p.is_dir() else p.unlink()
+            print(f"  removed {p.relative_to(ROOT)}")
+        except OSError as e:
+            print(f"  !! could not remove {p.relative_to(ROOT)}: {e}")
+    print("\nDone — every layer now starts from empty state.")
+
+
 def show_identity() -> None:
     """Show which identity a run will use — your gcloud account and, if set, the
     operator service account being impersonated for Terraform + gcloud."""
@@ -582,6 +627,7 @@ def build_menu() -> list[tuple[str, callable | None]]:
     items.append(("Manage secrets (push secrets.local.env -> Secret Manager)", lambda: manage_secrets()))
     items.append(("Reload secrets from Secret Manager", lambda: load_secrets()))
     items.append(("Show current identity (gcloud account / impersonation)", lambda: show_identity()))
+    items.append(("Delete ALL Terraform state (destructive — orphans live infra)", lambda: delete_all_state()))
     return items
 
 
