@@ -49,7 +49,7 @@ resource "google_project" "attendee" {
 
   # Protect the projects — `terraform destroy` will error rather than delete
   # them. Change to "DELETE" if you want teardown to remove the projects.
-  deletion_policy = "PREVENT"
+  deletion_policy = "DELETE"
 }
 
 locals {
